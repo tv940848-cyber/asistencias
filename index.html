@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Asistencia Firebase</title>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}
+body{background:linear-gradient(135deg,#4facfe,#00f2fe);min-height:100vh;padding:20px}
+.contenedor{max-width:1000px;margin:auto;background:#fff;border-radius:15px;padding:25px;box-shadow:0 10px 25px rgba(0,0,0,.2)}
+h1{text-align:center;margin-bottom:20px}
+.formulario{display:flex;gap:10px;margin-bottom:20px}
+textarea{flex:1;padding:12px;border:1px solid #ccc;border-radius:8px}
+button{padding:12px 20px;border:none;border-radius:8px;cursor:pointer;color:#fff;font-weight:bold}
+.btn-agregar{background:#28a745}.btn-pdf{background:#dc3545}.btn-borrar{background:#ff9800}
+table{width:100%;border-collapse:collapse;margin-top:15px}
+th{background:#007bff;color:white}
+th,td{padding:10px;border:1px solid #ddd;text-align:center}
+.presente{color:green;font-weight:bold}.ausente{color:red;font-weight:bold}
+.eliminar{background:red}
+.resumen{margin-top:20px;text-align:center;font-size:18px;font-weight:bold}
+</style>
+</head>
+<body>
+
+<div class="contenedor">
+<h1>📋 Sistema de Asistencia</h1>
+
+<div class="formulario">
+<textarea id="nombre" rows="5" placeholder="Escriba un nombre por línea"></textarea>
+<button class="btn-agregar" onclick="agregarAlumno()">Agregar</button>
+</div>
+
+<button class="btn-pdf" onclick="descargarPDF()">📄 Descargar PDF</button>
+<button class="btn-borrar" onclick="borrarTodo()">🗑️ Nueva Lista</button>
+<input type="file" id="archivoExcel" accept=".xlsx,.xls">
+
+<table>
+<thead>
+<tr>
+<th>N°</th><th>Nombre</th><th>Asistencia</th><th>Estado</th><th>Fecha</th><th>Eliminar</th>
+</tr>
+</thead>
+<tbody id="lista"></tbody>
+</table>
+
+<div class="resumen">
+Presentes: <span id="presentes">0</span> |
+Total: <span id="total">0</span>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-analytics.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+const firebaseConfig = {
+ apiKey: "AIzaSyDtNDQsyPmnMug9NPh8dGt_U4svCKSNYiU",
+ authDomain: "appp-baffa.firebaseapp.com",
+ databaseURL: "https://appp-baffa-default-rtdb.firebaseio.com",
+ projectId: "appp-baffa",
+ storageBucket: "appp-baffa.firebasestorage.app",
+ messagingSenderId: "282083881812",
+ appId: "1:282083881812:web:fccb371885ccd37c514ec1",
+ measurementId: "G-ECTGGW2ZMQ"
+};
+
+const app = initializeApp(firebaseConfig);
+getAnalytics(app);
+const db = getFirestore(app);
+
+let alumnos = [];
+
+async function cargarFirebase(){
+ alumnos=[];
+ const snap=await getDocs(collection(db,"asistencia"));
+ snap.forEach(d=>alumnos.push({id:d.id,...d.data()}));
+ console.log("Documentos cargados desde Firestore:", alumnos.length, alumnos);
+ mostrarDatos();
+}
+
+window.agregarAlumno=async()=>{
+ const texto=document.getElementById("nombre").value.trim();
+ if(!texto) return alert("Ingrese nombres");
+ for(let n of texto.split("\n")){
+   n=n.trim();
+   if(n) await addDoc(collection(db,"asistencia"),{nombre:n,presente:false,fecha:new Date().toLocaleString()});
+ }
+ document.getElementById("nombre").value="";
+ cargarFirebase();
+};
+
+function mostrarDatos(){
+ const tabla=document.getElementById("lista");
+ tabla.innerHTML="";
+ alumnos.forEach((a,i)=>{
+   tabla.innerHTML += `
+   <tr>
+   <td>${i+1}</td>
+   <td>${a.nombre}</td>
+   <td><input type="checkbox" ${a.presente?"checked":""} onchange="cambiarEstado(${i},this.checked)"></td>
+   <td class="${a.presente?'presente':'ausente'}">${a.presente?'Presente':'Ausente'}</td>
+   <td>${a.fecha}</td>
+   <td><button class="eliminar" onclick="eliminarAlumno(${i})">🗑️</button></td>
+   </tr>`;
+ });
+ document.getElementById("presentes").textContent=alumnos.filter(a=>a.presente).length;
+ document.getElementById("total").textContent=alumnos.length;
+}
+
+window.cambiarEstado=async(i,e)=>{
+ await updateDoc(doc(db,"asistencia",alumnos[i].id),{presente:e});
+ cargarFirebase();
+};
+
+window.eliminarAlumno=async(i)=>{
+ await deleteDoc(doc(db,"asistencia",alumnos[i].id));
+ cargarFirebase();
+};
+
+window.borrarTodo=async()=>{
+ if(!confirm("¿Eliminar toda la lista?")) return;
+ for(const a of alumnos){
+   await deleteDoc(doc(db,"asistencia",a.id));
+ }
+ cargarFirebase();
+};
+
+window.descargarPDF=()=>{
+ const {jsPDF}=window.jspdf;
+ const pdf=new jsPDF();
+ pdf.text("LISTA DE ASISTENCIA",70,15);
+ let y=30;
+ alumnos.forEach((a,i)=>{
+   pdf.text(`${i+1}. ${a.nombre} - ${a.presente?"Presente":"Ausente"} - ${a.fecha}`,10,y);
+   y+=10;
+   if(y>270){pdf.addPage();y=20;}
+ });
+ pdf.save("Lista_Asistencia.pdf");
+};
+
+document.getElementById("archivoExcel")
+.addEventListener("change", importarExcel);
+
+async function importarExcel(event){
+
+    console.log("Evento de archivo detectado:", event.target.files);
+
+    const archivo = event.target.files[0];
+
+    if(!archivo) return;
+
+    try{
+
+        const data = await archivo.arrayBuffer();
+
+        const workbook = XLSX.read(data,{
+            type:"array"
+        });
+
+        const hoja =
+        workbook.Sheets[
+            workbook.SheetNames[0]
+        ];
+
+        const filas =
+        XLSX.utils.sheet_to_json(
+            hoja,
+            {header:1}
+        );
+
+        console.log("Total de filas leídas del Excel:", filas.length);
+        console.log("Contenido completo de las filas:", filas);
+
+        const palabrasEncabezado = ["nombre","nombres","alumno","alumnos","estudiante","estudiantes","apellido","apellidos","n°","no","#"];
+
+        let importados = 0;
+
+        for(let i = 0; i < filas.length; i++){
+
+            const fila = filas[i];
+            if(!fila) continue;
+
+            // Busca la primera celda de la fila que tenga texto real (no vacía y no un número suelto,
+            // para no confundir un "N°" de fila con el nombre)
+            let nombre = null;
+            for(const celda of fila){
+                const valor = celda !== undefined && celda !== null ? String(celda).trim() : "";
+                if(valor !== "" && isNaN(Number(valor))){
+                    nombre = valor;
+                    break;
+                }
+            }
+
+            console.log(`Fila ${i}:`, fila, "-> nombre detectado:", nombre);
+
+            if(!nombre) continue;
+
+            // Si es la primera fila, comprobamos si parece un encabezado.
+            // Normalizamos quitando símbolos (°, º, #, etc.) para no depender de
+            // qué caracter exacto haya usado el Excel.
+            if(i === 0){
+                const normalizado = nombre.toLowerCase().replace(/[°º#.]/g, "").trim();
+                if(palabrasEncabezado.includes(normalizado) || normalizado === "n" || normalizado === ""){
+                    console.log("Fila 0 detectada como encabezado, se omite.");
+                    continue;
+                }
+            }
+
+            await addDoc(
+                collection(db,"asistencia"),
+                {
+                    nombre: nombre,
+                    presente: false,
+                    fecha: new Date().toLocaleString()
+                }
+            );
+
+            importados++;
+        }
+
+        await cargarFirebase();
+
+        alert(importados + " nombres importados");
+
+    }catch(error){
+
+        console.error(error);
+        alert("Error: " + error.message);
+
+    } finally {
+        // Resetea el input para que el evento "change" se dispare
+        // aunque el usuario vuelva a seleccionar el mismo archivo
+        event.target.value = "";
+    }
+}
+cargarFirebase();
+</script>
+</body>
+</html>
