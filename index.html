@@ -52,6 +52,7 @@ Total: <span id="total">0</span>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script type="module">
@@ -134,13 +135,32 @@ window.borrarTodo=async()=>{
 window.descargarPDF=()=>{
  const {jsPDF}=window.jspdf;
  const pdf=new jsPDF();
- pdf.text("LISTA DE ASISTENCIA",70,15);
- let y=30;
- alumnos.forEach((a,i)=>{
-   pdf.text(`${i+1}. ${a.nombre} - ${a.presente?"Presente":"Ausente"} - ${a.fecha}`,10,y);
-   y+=10;
-   if(y>270){pdf.addPage();y=20;}
+
+ pdf.setFontSize(16);
+ pdf.text("LISTA DE ASISTENCIA",105,15,{align:"center"});
+
+ const filas = alumnos.map((a,i)=>[
+   i+1,
+   a.nombre,
+   a.presente?"Presente":"Ausente",
+   a.fecha
+ ]);
+
+ pdf.autoTable({
+   startY: 25,
+   head: [["N°","Nombre","Estado","Fecha"]],
+   body: filas,
+   styles:{ fontSize:10, halign:"center" },
+   headStyles:{ fillColor:[0,123,255], textColor:255, fontStyle:"bold" },
+   columnStyles:{ 1:{ halign:"left" } },
+   didParseCell: function(data){
+     if(data.section==="body" && data.column.index===2){
+       data.cell.styles.textColor = data.cell.raw==="Presente" ? [0,128,0] : [200,0,0];
+       data.cell.styles.fontStyle = "bold";
+     }
+   }
  });
+
  pdf.save("Lista_Asistencia.pdf");
 };
 
