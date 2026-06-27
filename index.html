@@ -14,12 +14,28 @@ h1{text-align:center;margin-bottom:20px}
 textarea{flex:1;padding:12px;border:1px solid #ccc;border-radius:8px}
 button{padding:12px 20px;border:none;border-radius:8px;cursor:pointer;color:#fff;font-weight:bold}
 .btn-agregar{background:#28a745}.btn-pdf{background:#dc3545}.btn-borrar{background:#ff9800}
-table{width:100%;border-collapse:collapse;margin-top:15px}
+.acciones{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:15px}
+.tabla-wrapper{width:100%;overflow-x:auto}
+table{width:100%;border-collapse:collapse;margin-top:15px;min-width:600px}
 th{background:#007bff;color:white}
 th,td{padding:10px;border:1px solid #ddd;text-align:center}
 .presente{color:green;font-weight:bold}.ausente{color:red;font-weight:bold}
 .eliminar{background:red}
 .resumen{margin-top:20px;text-align:center;font-size:18px;font-weight:bold}
+
+@media (max-width: 600px){
+  body{padding:10px}
+  .contenedor{padding:15px;border-radius:10px}
+  h1{font-size:22px;flex-wrap:wrap}
+  .formulario{flex-direction:column}
+  textarea{width:100%}
+  .formulario button{width:100%}
+  .acciones{flex-direction:column;align-items:stretch}
+  .acciones button{width:100%}
+  input[type="file"]{width:100%}
+  th,td{padding:8px;font-size:13px}
+  .resumen{font-size:16px}
+}
 </style>
 </head>
 <body>
@@ -32,10 +48,13 @@ th,td{padding:10px;border:1px solid #ddd;text-align:center}
 <button class="btn-agregar" onclick="agregarAlumno()">Agregar</button>
 </div>
 
+<div class="acciones">
 <button class="btn-pdf" onclick="descargarPDF()">📄 Descargar PDF</button>
 <button class="btn-borrar" onclick="borrarTodo()">🗑️ Nueva Lista</button>
 <input type="file" id="archivoExcel" accept=".xlsx,.xls">
+</div>
 
+<div class="tabla-wrapper">
 <table>
 <thead>
 <tr>
@@ -44,6 +63,7 @@ th,td{padding:10px;border:1px solid #ddd;text-align:center}
 </thead>
 <tbody id="lista"></tbody>
 </table>
+</div>
 
 <div class="resumen">
 Presentes: <span id="presentes">0</span> |
